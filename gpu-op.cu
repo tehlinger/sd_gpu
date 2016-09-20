@@ -120,7 +120,14 @@ void gpuProduct(gkid_t kid)
    break;
 
  case GK2 :
-  break;
+   Db.x = BLOCK_SIZE_X_K0;
+   Db.y = BLOCK_SIZE_Y_K0;
+   Db.z = 1;
+   Dg.x = SIZE/BLOCK_SIZE_X_K0 + (SIZE%BLOCK_SIZE_X_K0  ?  1  :  0);
+   Dg.y = SIZE/BLOCK_SIZE_Y_K0 + (SIZE%BLOCK_SIZE_Y_K0  ?  1  :  0);
+   Dg.z = 1;
+   // - run the Grid of Blocs of threads
+   MatrixProductKernel_v0<<<Dg,Db>>>();
   
  case GK3 :
   break;
