@@ -25,8 +25,8 @@
 #define DEFAULT_GPUKID      GK0        // Constant for GPU Kernel config
 
 // Block sizes
-#define BLOCK_SIZE_X_K0     128
-#define BLOCK_SIZE_Y_K0     3
+#define BLOCK_SIZE_X_K0     512
+#define BLOCK_SIZE_Y_K0     2
 
 
 /*-------------------------------------------------------------------------------*/
