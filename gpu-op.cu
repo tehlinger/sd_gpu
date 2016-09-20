@@ -69,18 +69,21 @@ void gpuGetResultOnCPU(void)
 __global__ void MatrixProductKernel_v0(void)
 {
  // Index computations
- int lig = threadIdx.x;
- int col = threadIdx.y;
- double res = 0.0;
+ int col = (blockIdx.y * blockDim.y) + threadIdx.y;
+ int lig = (blockIdx.x * blockDim.x) + threadIdx.x;
 
- // Matrix product computation$
- int i;
- for(i=0;i<SIZE;i++)
- {
-  res += GPU_A[i][lig]*GPU_B[col][i];
- }
+ if(col < SIZE && lig < SIZE){ 
+	 double res = 0.0;
 
- GPU_C[col][lig] = res;
+	 // Matrix product computation
+	 int i;
+	 for(i=0;i<SIZE;i++)
+	 {
+	  res += GPU_A[i][lig]*GPU_B[col][i];
+	 }
+
+	 GPU_C[col][lig] = res;
+	}
 }
 
 
@@ -95,18 +98,26 @@ void gpuProduct(gkid_t kid)
 
  case GK0 : // Kernel v0 - using only global memory (with coalescent data accesses)
    // - init the grid of blocs
-   Db.x = SIZE;
-   Db.y = 1;
+   Db.x = BLOCK_SIZE_X_K0;
+   Db.y = BLOCK_SIZE_Y_K0;
    Db.z = 1;
    Dg.x = SIZE/BLOCK_SIZE_X_K0;
-   Dg.y = 1;
+   Dg.y = SIZE/BLOCK_SIZE_Y_K0;
    Dg.z = 1;
    // - run the Grid of Blocs of threads
    MatrixProductKernel_v0<<<Dg,Db>>>();
    break;
 
  case GK1 :
-  break;
+   Db.x = BLOCK_SIZE_X_K0;
+   Db.y = BLOCK_SIZE_Y_K0;
+   Db.z = 1;
+   Dg.x = SIZE/BLOCK_SIZE_X_K0 + (SIZE%BLOCK_SIZE_X_K0  ?  1  :  0);
+   Dg.y = SIZE/BLOCK_SIZE_Y_K0 + (SIZE%BLOCK_SIZE_Y_K0  ?  1  :  0);
+   Dg.z = 1;
+   // - run the Grid of Blocs of threads
+   MatrixProductKernel_v0<<<Dg,Db>>>();
+   break;
 
  case GK2 :
   break;
