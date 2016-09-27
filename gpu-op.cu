@@ -129,28 +129,31 @@ __global__ void MatrixProductKernel_v4(void){
 	__shared__ double shared_A[BLOCK_SIZE_X_K3][BLOCK_SIZE_Y_K3];
 	__shared__ double shared_B[BLOCK_SIZE_X_K3][BLOCK_SIZE_Y_K3];
 	res = 0.0;
-	for(i = 0; i < (SIZE / BLOCK_SIZE_X_K3)+(SIZE%BLOCK_SIZE_X_K3?  1  :  0); i++){
+	for(i = 0; i <	 (SIZE / BLOCK_SIZE_X_K3)+(SIZE%BLOCK_SIZE_X_K3?1:0); i++){
 		int offset = i * BLOCK_SIZE_X_K3;
-		if((offset+threadIdx.x) < SIZE){
+		if((offset+threadIdx.x) < SIZE && lig < SIZE){
 			shared_A[threadIdx.y][threadIdx.x] = GPU_A[lig][offset + threadIdx.x];
 		}
-		if((offset+threadIdx.y) < SIZE){
+		if((offset+threadIdx.y) < SIZE && col < SIZE){
 			shared_B[threadIdx.y][threadIdx.x] = GPU_B[offset + threadIdx.y][col];
 		}
 			__syncthreads();	
 		
 		// Matrix product computation
+		if(offset < SIZE-1){
 			for(j=0;j<BLOCK_SIZE_X_K3;j++){
-				if(j + offset < SIZE){
-					res += shared_A[threadIdx.y][j]*shared_B[j][threadIdx.x];
-				}
+				res += shared_A[threadIdx.y][j]*shared_B[j][threadIdx.x];
 			}
-			__syncthreads();	
-			
+		}else{
+			for(j=0;j< (SIZE%BLOCK_SIZE_X_K3);j++){
+					res += shared_A[threadIdx.y][j]*shared_B[j][threadIdx.x];			
+			}			
 		}
+	__syncthreads();
 	if(col < SIZE && lig < SIZE){
 		GPU_C[lig][col] = res;
 	}	
+  }
 }
 	
 	
