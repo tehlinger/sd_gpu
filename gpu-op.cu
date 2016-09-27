@@ -89,8 +89,7 @@
 	/*-------------------------------------------------------------------------------*/
 	/* Small matrix product on the local GPU.                                        */
 	/*-------------------------------------------------------------------------------*/
-	__global__ void MatrixProductKernel_v3(void)
-	{
+__global__ void MatrixProductKernel_v3(void){
 	// Index computations
 	int i,j;
 	int col = (blockIdx.x * blockDim.x) + threadIdx.x;
@@ -104,7 +103,7 @@
 	double res = 0.0;
 	for(i = 0; i < (SIZE / BLOCK_SIZE_X_K3); i++){
 		//if(col < SIZE && lig < SIZE){ 
-			int offset = j * BLOCK_SIZE_X_K3;
+			int offset = i * BLOCK_SIZE_X_K3;
 			shared_A[threadIdx.y][threadIdx.x] = GPU_A[lig][offset + threadIdx.x];
 			shared_B[threadIdx.y][threadIdx.x] = GPU_B[offset + threadIdx.y][col];
 		//}
@@ -112,14 +111,15 @@
 	
 	// Matrix product computation
 		for(j=0;j<BLOCK_SIZE_X_K3;j++){
-			res += shared_A[j][threadIdx.x]*shared_B[threadIdx.y][j];
+			//res += shared_A[j][threadIdx.x]*shared_B[threadIdx.y][j];
+			res += shared_A[threadIdx.y][j]*shared_B[j][threadIdx.x];
 		}
 	    __syncthreads();	
 		
 	}
-	GPU_C[col][lig] = res;
+	GPU_C[lig][col] = res;
 	}
-	}
+}
 	
 	
 	/*-------------------------------------------------------------------------------*/
@@ -186,6 +186,6 @@
 	fprintf(stderr,"Unknown GPU kernel!");
 	exit(EXIT_FAILURE);
 	}
-	}
+}
 	
 	
