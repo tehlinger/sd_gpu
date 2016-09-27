@@ -94,31 +94,63 @@ __global__ void MatrixProductKernel_v3(void){
 	int i,j;
 	int col = (blockIdx.x * blockDim.x) + threadIdx.x;
 	int lig = (blockIdx.y * blockDim.y) + threadIdx.y;
+	if(col < SIZE && lig < SIZE){
+		__shared__ double shared_A[BLOCK_SIZE_X_K3][BLOCK_SIZE_Y_K3];
+		__shared__ double shared_B[BLOCK_SIZE_X_K3][BLOCK_SIZE_Y_K3];
+		double res = 0.0;
+		for(i = 0; i < (SIZE / BLOCK_SIZE_X_K3)+(SIZE%BLOCK_SIZE_X_K3?  1  :  0); i++){
+			int offset = i * BLOCK_SIZE_X_K3;
+			if((offset+threadIdx.x) < SIZE && (offset+threadIdx.y) < SIZE){
+				shared_A[threadIdx.y][threadIdx.x] = GPU_A[lig][offset + threadIdx.x];
+				shared_B[threadIdx.y][threadIdx.x] = GPU_B[offset + threadIdx.y][col];
+				__syncthreads();	
+			
+			// Matrix product computation
+				for(j=0;j<BLOCK_SIZE_X_K3;j++){
+					if(j + offset < SIZE){
+					res += shared_A[threadIdx.y][j]*shared_B[j][threadIdx.x];
+					}
+				}
+				__syncthreads();	
+				
+			}
+		}	
+		GPU_C[lig][col] = res;
+	}
+}
+
+
+__global__ void MatrixProductKernel_v4(void){
+	// Index computations
+	int i,j;
+	int col = (blockIdx.x * blockDim.x) + threadIdx.x;
+	int lig = (blockIdx.y * blockDim.y) + threadIdx.y;
+	double res;
 	__shared__ double shared_A[BLOCK_SIZE_X_K3][BLOCK_SIZE_Y_K3];
 	__shared__ double shared_B[BLOCK_SIZE_X_K3][BLOCK_SIZE_Y_K3];
-	
-	
-	
-	if(col < SIZE && lig < SIZE){ 
-	double res = 0.0;
+	res = 0.0;
 	for(i = 0; i < (SIZE / BLOCK_SIZE_X_K3); i++){
-		//if(col < SIZE && lig < SIZE){ 
-			int offset = i * BLOCK_SIZE_X_K3;
+		int offset = i * BLOCK_SIZE_X_K3;
+		if((offset+threadIdx.x) < SIZE){
 			shared_A[threadIdx.y][threadIdx.x] = GPU_A[lig][offset + threadIdx.x];
-			shared_B[threadIdx.y][threadIdx.x] = GPU_B[offset + threadIdx.y][col];
-		//}
-		__syncthreads();	
-	
-	// Matrix product computation
-		for(j=0;j<BLOCK_SIZE_X_K3;j++){
-			//res += shared_A[j][threadIdx.x]*shared_B[threadIdx.y][j];
-			res += shared_A[threadIdx.y][j]*shared_B[j][threadIdx.x];
 		}
-	    __syncthreads();	
+		if((offset+threadIdx.y) < SIZE){
+			shared_B[threadIdx.y][threadIdx.x] = GPU_B[offset + threadIdx.y][col];
+		}
+			__syncthreads();	
 		
-	}
-	GPU_C[lig][col] = res;
-	}
+		// Matrix product computation
+			for(j=0;j<BLOCK_SIZE_X_K3;j++){
+				if(j + offset < SIZE){
+					res += shared_A[threadIdx.y][j]*shared_B[j][threadIdx.x];
+				}
+			}
+			__syncthreads();	
+			
+		}
+	if(col < SIZE && lig < SIZE){
+		GPU_C[lig][col] = res;
+	}	
 }
 	
 	
@@ -177,6 +209,14 @@ __global__ void MatrixProductKernel_v3(void){
 	break;
 	
 	case GK4 :
+	Db.x = BLOCK_SIZE_X_K3;
+	Db.y = BLOCK_SIZE_Y_K3;
+	Db.z = 1;
+	Dg.x = SIZE/BLOCK_SIZE_X_K3 + (SIZE%BLOCK_SIZE_X_K3  ?  1  :  0);
+	Dg.y = SIZE/BLOCK_SIZE_Y_K3 + (SIZE%BLOCK_SIZE_Y_K3  ?  1  :  0);
+	Dg.z = 1;
+	// - run the Grid of Blocs of threads
+	MatrixProductKernel_v4<<<Dg,Db>>>();
 	break;
 	
 	case GK5 :
