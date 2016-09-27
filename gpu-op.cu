@@ -129,7 +129,7 @@ __global__ void MatrixProductKernel_v4(void){
 	__shared__ double shared_A[BLOCK_SIZE_X_K3][BLOCK_SIZE_Y_K3];
 	__shared__ double shared_B[BLOCK_SIZE_X_K3][BLOCK_SIZE_Y_K3];
 	res = 0.0;
-	for(i = 0; i < (SIZE / BLOCK_SIZE_X_K3); i++){
+	for(i = 0; i < (SIZE / BLOCK_SIZE_X_K3)+(SIZE%BLOCK_SIZE_X_K3?  1  :  0); i++){
 		int offset = i * BLOCK_SIZE_X_K3;
 		if((offset+threadIdx.x) < SIZE){
 			shared_A[threadIdx.y][threadIdx.x] = GPU_A[lig][offset + threadIdx.x];
