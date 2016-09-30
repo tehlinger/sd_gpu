@@ -27,6 +27,7 @@
 \usepackage{graphicx} %package to manage images
 \usepackage{listings}
 \usepackage{color}
+\usepackage{subfig}
 
 \definecolor{mygreen}{rgb}{0,0.6,0}
 \definecolor{mygray}{rgb}{0.5,0.5,0.5}
@@ -158,26 +159,37 @@
 \maketitle
 \thispagestyle{fancy} 			% Enabling the custom headers/footers for the first page 
 % The first character should be within \initial{}
-\initial{D}\textbf{ans} ce TP nous devions exécuter des produits matriciels, qui sont des opérations mathématiques très gourmandes, avec des complexité algorithmique de l'ordre de $ \mathcal{O}(n^3)$. Afin de mettre pleinement à disposition les capacités de nos machines, nous avons donc exécuté les calculs cette fois sur la carte graphique de nos ordinateurs, grâce à la technologie CUDA (Compute Unified Device Architecture). Comme pour le TP précédent, il s'agit d'un produit de matrices $ 4096 \times 4096$. 
+\initial{D}\textbf{ans} ce TP nous devions exécuter des produits matriciels, qui sont des opérations mathématiques très gourmandes, avec des complexité algorithmique de l'ordre de $ \mathcal{O}(n^3)$. Afin de mettre pleinement à disposition les capacités de nos machines, nous avons donc exécuté les calculs cette fois sur la carte graphique de nos ordinateurs, grâce à la technologie CUDA (Compute Unified Device Architecture). Comme pour le TP précédent, il s'agit d'un produit de matrices $ 4096 \times 4096$. Il est à noter que sur les cartes graphiques des machines de la salle J4 , des \textbf{gtx680, architecture Kepler}, nous n'avions pas le droit de lancer des calculs trop longs. Pour des raisons de sécurité, sans doute, il nous était impossible de réaliser des calculs dépassant les 11-12 secondes. Néanmoins cela ne nous a pas empêché d'obtenir des résultats concluants, étant donné que de toute manière nous cherchions à optimiser le temps de calcul.\par
+Dans ce rapport, nous expliquerons tout d'abord les problématiques de dimensionnement des blocs de \textit{threads} et leurs conséquences. Puis, nous étudierons les différents temps et puissances de calculs obtenus en fonction du dimensionnement des blocs, sur le kernel 2. Enfin, nous traiterons les expérimentations effectuées sur le kernel 4, en nous concentrant sur la mémoire partagée : comment l'utiliser au mieux et les bienfaits de son utilisation. 
 
+\section{Contexte}
+\subsection{Environnement d'expérimentation}
+Comme dit précédemment, nous travaillons ici sur une carte graphique \textbf{gtx680, architecture Kepler}. Les données ont été prélevées une seule fois, puis notées sur un fichier \texttt{Excel} prévu à cet effet. Ensuite, nous avons converti ces donnés au format \texttt{csv}, qui ont ensuite été représentées graphiquement avec \texttt{Gnuplot}. Parallèlement, nous avons aussi intégré dans ce rapport un graphique qui était déjà généré dans la feuille \texttt{Excel}.
+\subsection*{Des dilemmes de pavage}
+L'intérêt du calcul distribué sur une carte graphique est de mettre à profit la puissance de calcul d'une GPU. En revanche, les GPU sont optimisées pour les calculs dits \textit{SIMD}, pour \textit{single instruction - multiple data}, ce qui veut dire qu'il est très simple pour une carte graphique de réaliser moult fois la même instruction sur un grand jeu de données diversifiées. Le calcul matriciel correspond exactement à ce genre de calculs.\par
+Une GPU s'organise en blocs de \textit{threads}, aussi appelés \textit{warps}. Chaque \textit{thread} est en charge d'une toute partie du calcul. En effet ces \textit{threads} ne sont pas faits pour se comporter comme des \textit{threads} POSIX : ils sont conçus pour réaliser des calculs très très simples. Ici, par exemple, un \textit{thread} est en charge d'une seule et unique case de la matrice résultat à la fois. Ce qui veut dire qu'il gère la somme de $Nb_{colonnes}(\mathcal{A}) \times (Nb_{lignes}\mathcal{B})$ produits de \texttt{double}.\par
+Une première contrainte est que le nombre de \textit{threads} par bloc ne peut dépasser 1024. On est aussi limité pour le nombre total de blocs, mais cette limite ne nous a pas concerné pour notre TP, celle-ci allant de $2^{16}$ à $2^{31} - 1$. Le dilemme mis en exergue dans ce TP concerne le dimensionnement de ces blocs : en effet, on peut subdiviser les matrices à multiplier entre elles en blocs de différentes tailles, ce qui a différentes conséquences. Les questions auxquelles nous essaierons de répondre sont : 
+\begin{itemize}
+\item Sur une seule dimension, quelle semble être la largeur optimale?
+\item Sur deux dimensions, quel(s) facteur(s) influe le plus sur les différentes puissances/durées de calcul?
+\end{itemize}
 
-
-
-\subsection*{Résultats}
-
-\subsubsection*{Conditions d'expérimentation}
-Les mesures de l'expérimentation n'ont été effectuées qu'une seule fois. Il est donc claire que ces résultats sont qualitatifs et non quantitatifs. Ce rapport sert surtout à mettre en avant un raisonnement. Les conclusions sont à prendre avec précautions et à revérifier expérimentalement sur plus d'essais. \newline
-Nous nous sommes basés sur le temps d'exécution de la boucle pour les mesures de temps.
-
-\subsubsection*{Kernel 1 contre kernel 0}
-
-\subsubsection*{\textit{Round robin} contre une répartition voisine des tâches}
 \begin{figure}
-\centering
-\includegraphics[keepaspectratio,width=8.5cm]{img/rr_v.png} 
-\caption{Comparaison du temps d'exécution en round robin contre voisins pour 1 et 2 threads. Les performances sont \textit{évidemment} les mêmes pour un seul nœud.}
-\label{fig:rr_v}
+    \subfloat[Temps de calcul en fonction de la largeur de bloc.
+      \label{img:1DK1_time}]{%
+      \includegraphics[keepaspectratio,width=0.47\textwidth]{img/bloc_1D_time.png}
+    }
+    \hfill
+    \subfloat[Puissance de calcul en fonction de la largeur de bloc.
+      \label{img:1DK1_power}]{%
+      \includegraphics[keepaspectratio,width=0.47\textwidth]{img/bloc_1D_power.png}
+    }
+    \caption{Temps et puissance de calcul en fonction de la largeur du bloc 1D.}
+    \label{fig:1DK1}
 \end{figure}
+
+
+
 
 \subsection*{Initialisation MPI}
 \begin{lstlisting}

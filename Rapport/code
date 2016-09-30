@@ -1,0 +1,45 @@
+Init.c | l17-l24
+
+/*-------------------------------------------------------------------------------*/
+/* Initialisation of processor coordinates.                                      */
+/*-------------------------------------------------------------------------------*/
+void ProcessorInit(void)
+{
+  MPI_Comm_size(MPI_COMM_WORLD,&NbPE);
+  MPI_Comm_rank(MPI_COMM_WORLD,&Me);
+}
+
+
+
+main.c | l45-l67
+
+/*-------------------------------------------------------------------------------*/
+/* Parallel computation: local computations and data circulations.               */
+/*-------------------------------------------------------------------------------*/
+void ComputationAndCirculation()
+{
+ unsigned long step;
+ 
+ for(step=0;step<NbPE;step++) { 
+  OneLocalProduct(step);
+  OneStepCirculation(step);
+ }
+}
+
+
+/*-------------------------------------------------------------------------------*/
+/* Elementary circulation of A and B.                                            */
+/*-------------------------------------------------------------------------------*/
+void OneStepCirculation(unsigned long step)
+{
+ MPI_Status   status;
+
+ MPI_Sendrecv_replace(A_Slice, SIZE*LOCAL_SIZE, MPI_DOUBLE, (Me-1+NbPE)%NbPE, 0, (Me+1)%NbPE, 0, MPI_COMM_WORLD, &status);
+}
+
+
+
+Calcul.c | l28-29
+
+  // Compute the current step offset, in the MPI program, to access right C lines
+  OffsetStepLigC = ((Me + step) * LOCAL_SIZE) % SIZE;
