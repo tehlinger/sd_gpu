@@ -1,0 +1,223 @@
+%%% LaTeX Template: Two column article
+%%%
+%%% Source: http://www.howtotex.com/
+%%% Feel free to distribute this template, but please keep to referal to http://www.howtotex.com/ here.
+%%% Date: February 2011
+
+%%% Preamble
+\documentclass[	DIV=calc,%
+							paper=a4,%
+							fontsize=11pt%
+							]{scrartcl}	 					% KOMA-article class
+
+\usepackage{lipsum}													% Package to create dummy text
+
+\usepackage[french]{babel}										% English language/hyphenation
+\usepackage[protrusion=true,expansion=true]{microtype}				% Better typography
+\usepackage{amsmath,amsfonts,amsthm}					% Math packages
+\usepackage[pdftex]{graphicx}									% Enable pdflatex
+\usepackage[svgnames]{xcolor}									% Enabling colors by their 'svgnames'
+\usepackage[hang, small,labelfont=bf,up,textfont=it,up]{caption}	% Custom captions under/above floats
+\usepackage{epstopdf}												% Converts .eps to .pdf
+\usepackage{subfig}													% Subfigures
+\usepackage{booktabs}												% Nicer tables
+\usepackage{fix-cm}													% Custom fontsizes
+\usepackage[utf8]{inputenc}
+\usepackage[rightcaption]{sidecap} 
+\usepackage{graphicx} %package to manage images
+\usepackage{listings}
+\usepackage{color}
+
+\definecolor{mygreen}{rgb}{0,0.6,0}
+\definecolor{mygray}{rgb}{0.5,0.5,0.5}
+\definecolor{mymauve}{rgb}{0.58,0,0.82}
+
+\lstdefinestyle{customc}{
+  belowcaptionskip=1\baselineskip,
+  breaklines=true,
+  frame=L,
+  xleftmargin=\parindent,
+  language=C,
+  showstringspaces=false,
+  basicstyle=\footnotesize\ttfamily,
+  keywordstyle=\bfseries\color{green!40!black},
+  commentstyle=\itshape\color{purple!40!black},
+  identifierstyle=\color{blue},
+  stringstyle=\color{orange},
+}
+
+\lstdefinestyle{customasm}{
+  belowcaptionskip=1\baselineskip,
+  frame=L,
+  xleftmargin=\parindent,
+  language=[x86masm]Assembler,
+  basicstyle=\footnotesize\ttfamily,
+  commentstyle=\itshape\color{purple!40!black},
+}
+
+\lstset{escapechar=@,style=customc}
+
+\lstset{ %
+  language=C,
+  backgroundcolor=\color{white},   % choose the background color; you must add \usepackage{color} or \usepackage{xcolor}
+  basicstyle=\footnotesize,        % the size of the fonts that are used for the code
+  breakatwhitespace=false,         % sets if automatic breaks should only happen at whitespace
+  breaklines=true,                 % sets automatic line breaking
+  captionpos=b,                    % sets the caption-position to bottom
+  commentstyle=\color{mygreen},    % comment style
+  deletekeywords={...},            % if you want to delete keywords from the given language
+  escapeinside={\%*}{*)},          % if you want to add LaTeX within your code
+  extendedchars=true,              % lets you use non-ASCII characters; for 8-bits encodings only, does not work with UTF-8
+  frame=single,	                   % adds a frame around the code
+  keepspaces=true,                 % keeps spaces in text, useful for keeping indentation of code (possibly needs columns=flexible)
+  keywordstyle=\color{blue},       % keyword style
+  language=Octave,                 % the language of the code
+  otherkeywords={*,...},           % if you want to add more keywords to the set
+  numbers=left,                    % where to put the line-numbers; possible values are (none, left, right)
+  numbersep=5pt,                   % how far the line-numbers are from the code
+  numberstyle=\tiny\color{mygray}, % the style that is used for the line-numbers
+  rulecolor=\color{black},         % if not set, the frame-color may be changed on line-breaks within not-black text (e.g. comments (green here))
+  showspaces=false,                % show spaces everywhere adding particular underscores; it overrides 'showstringspaces'
+  showstringspaces=false,          % underline spaces within strings only
+  showtabs=false,                  % show tabs within strings adding particular underscores
+  stepnumber=2,                    % the step between two line-numbers. If it's 1, each line will be numbered
+  stringstyle=\color{mymauve},     % string literal style
+  tabsize=2,	                   % sets default tabsize to 2 spaces
+  title=\lstname                   % show the filename of files included with \lstinputlisting; also try caption instead of title
+}
+
+
+
+%%% Custom sectioning (sectsty package)
+\usepackage{sectsty}													% Custom sectioning (see below)
+\allsectionsfont{%															% Change font of al section commands
+	\usefont{OT1}{phv}{b}{n}%										% bch-b-n: CharterBT-Bold font
+	}
+
+\sectionfont{%																% Change font of \section command
+	\usefont{OT1}{phv}{b}{n}%										% bch-b-n: CharterBT-Bold font
+	}
+
+
+
+%%% Headers and footers
+\usepackage{fancyhdr}												% Needed to define custom headers/footers
+	\pagestyle{fancy}														% Enabling the custom headers/footers
+\usepackage{lastpage}	
+
+% Header (empty)
+\lhead{}
+\chead{}
+\rhead{}
+% Footer (you may change this to your own needs)
+\lfoot{\footnotesize \texttt{Thibaut EHLINGER, Benjamin HERB} \textbullet ~Systèmes distribués et grilles : TP2}
+\cfoot{}
+\rfoot{\footnotesize page \thepage\ of \pageref{LastPage}}	% "Page 1 of 2"
+\renewcommand{\headrulewidth}{0.0pt}
+\renewcommand{\footrulewidth}{0.4pt}
+
+
+
+%%% Creating an initial of the very first character of the content
+\usepackage{lettrine}
+\newcommand{\initial}[1]{%
+     \lettrine[lines=3,lhang=0.3,nindent=0em]{
+     				\color{DarkGoldenrod}
+     				{\textsf{#1}}}{}}
+
+
+
+%%% Title, author and date metadata
+\usepackage{titling}															% For custom titles
+
+\newcommand{\HorRule}{\color{DarkGoldenrod}%			% Creating a horizontal rule
+									  	\rule{\linewidth}{1pt}%
+										}
+										
+										\renewcommand\thesubsubsection{}
+
+\pretitle{\vspace{-15pt} \begin{flushleft} \HorRule 
+				\fontsize{15}{15} \usefont{OT1}{phv}{b}{n} \color{DarkRed} \selectfont 
+				}
+\title{Systèmes distribués et grilles : TP CUDA}					% Title of your article goes here
+\posttitle{\par\end{flushleft}\vskip 0.1em}
+
+\preauthor{\begin{flushleft}
+					\large \lineskip 0.1em \usefont{OT1}{phv}{b}{sl} \color{DarkRed}}
+\author{Thibaut EHLINGER, Benjamin HERB }											% Author name goes here
+\postauthor{\footnotesize \usefont{OT1}{phv}{m}{sl} \color{Black} 
+					Université de Strasbourg 								% Institution of author
+					\par\end{flushleft}\HorRule}
+
+\date{19 septembre 2016}																			
+
+
+
+%%% Begin document
+\begin{document}
+\maketitle
+\thispagestyle{fancy} 			% Enabling the custom headers/footers for the first page 
+% The first character should be within \initial{}
+\initial{D}\textbf{ans} ce TP nous devions exécuter des produits matriciels, qui sont des opérations mathématiques très gourmandes, avec des complexité algorithmique de l'ordre de $ \mathcal{O}(n^3)$. Afin de mettre pleinement à disposition les capacités de nos machines, nous avons donc exécuté les calculs cette fois sur la carte graphique de nos ordinateurs, grâce à la technologie CUDA (Compute Unified Device Architecture). Comme pour le TP précédent, il s'agit d'un produit de matrices $ 4096 \times 4096$. 
+
+
+
+
+\subsection*{Résultats}
+
+\subsubsection*{Conditions d'expérimentation}
+Les mesures de l'expérimentation n'ont été effectuées qu'une seule fois. Il est donc claire que ces résultats sont qualitatifs et non quantitatifs. Ce rapport sert surtout à mettre en avant un raisonnement. Les conclusions sont à prendre avec précautions et à revérifier expérimentalement sur plus d'essais. \newline
+Nous nous sommes basés sur le temps d'exécution de la boucle pour les mesures de temps.
+
+\subsubsection*{Kernel 1 contre kernel 0}
+
+\subsubsection*{\textit{Round robin} contre une répartition voisine des tâches}
+\begin{figure}
+\centering
+\includegraphics[keepaspectratio,width=8.5cm]{img/rr_v.png} 
+\caption{Comparaison du temps d'exécution en round robin contre voisins pour 1 et 2 threads. Les performances sont \textit{évidemment} les mêmes pour un seul nœud.}
+\label{fig:rr_v}
+\end{figure}
+
+\subsection*{Initialisation MPI}
+\begin{lstlisting}
+#include <stdio.h>
+#define N 10
+
+/* Initialisation of processor coordinates */
+
+void ProcessorInit(void){
+	MPI_Comm_size(MPI_COMM_WORLD,&NbPE);
+  	MPI_Comm_rank(MPI_COMM_WORLD,&Me);
+}
+\end{lstlisting}
+
+\newpage
+
+\subsection*{Calcul de l'offset pour un processus {\texttt{Me} donné}}
+\begin{lstlisting}
+/* Compute the current step offset, in the MPI program, to access right C lines */ OffsetStepLigC = ((Me + step) * LOCAL_SIZE) % SIZE; 
+\end{lstlisting}
+
+\subsection*{Boucle principale}
+\begin{lstlisting}
+void ComputationAndCirculation()
+{
+ unsigned long step;
+ 
+ for(step=0;step<NbPE;step++) { 
+  OneLocalProduct(step);
+  OneStepCirculation(step);
+ }
+}
+/* Elementary circulation of A and B.                                            */
+void OneStepCirculation(unsigned long step)
+{
+ MPI_Status   status;
+
+ MPI_Sendrecv_replace(A_Slice, SIZE*LOCAL_SIZE, MPI_DOUBLE, (Me-1+NbPE)%NbPE, 0, (Me+1)%NbPE, 0, MPI_COMM_WORLD, &status);
+}
+
+
+\end{lstlisting} 
+\end{document}
