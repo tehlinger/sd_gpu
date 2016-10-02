@@ -269,50 +269,108 @@ Enfin, les performances sont très fortement améliorées si l'on gère attentiv
 \newpage
 
 \section{Annexe : code}
-
-\subsection{Exemple du rapport précédent}%A supprimer, Ben ;)
-\begin{lstlisting}
-#include <stdio.h>
-#define N 10
-
-/* Initialisation of processor coordinates */
-
-void ProcessorInit(void){
-	MPI_Comm_size(MPI_COMM_WORLD,&NbPE);
-  	MPI_Comm_rank(MPI_COMM_WORLD,&Me);
-}
-\end{lstlisting}
-
-
-\subsection*{Calcul de l'offset pour un processus {\texttt{Me} donné}}
-\begin{lstlisting}
-/* Compute the current step offset, in the MPI program, to access right C lines */ OffsetStepLigC = ((Me + step) * LOCAL_SIZE) % SIZE; 
-\end{lstlisting}
-
-\subsection*{Boucle principale}
-\begin{lstlisting}
-void ComputationAndCirculation()
-{
- unsigned long step;
- 
- for(step=0;step<NbPE;step++) { 
-  OneLocalProduct(step);
-  OneStepCirculation(step);
- }
-}
-/* Elementary circulation of A and B.                                            */
-void OneStepCirculation(unsigned long step)
-{
- MPI_Status   status;
-
- MPI_Sendrecv_replace(A_Slice, SIZE*LOCAL_SIZE, MPI_DOUBLE, (Me-1+NbPE)%NbPE, 0, (Me+1)%NbPE, 0, MPI_COMM_WORLD, &status);
-}
-
-
-\end{lstlisting} 
-
-\subsection{Kernel 1 : Blocs 1D}
 \subsection{Kernel 2 : Blocs 2D, sans gestion de mémoire}
+\begin{lstlisting}
+#define BLOCK_SIZE_X_K2     32
+#define BLOCK_SIZE_Y_K2 BLOCK_SIZE_X_K2
+\end{lstlisting}
+\begin{lstlisting}
+__global__ void MatrixProductKernel_v0(void)
+{
+	// Calcul des index
+	int col = (blockIdx.y * blockDim.y) + threadIdx.y;
+	int lig = (blockIdx.x * blockDim.x) + threadIdx.x;
+	
+	// Si les index sont inferieurs a la taille des matrices
+	if(col < SIZE && lig < SIZE){ 
+		double res = 0.0;
+		int i;
+		
+		// Calcul du produit d'une ligne de A et d'une colonne de B
+		for(i=0;i<SIZE;i++)
+		{
+			res += GPU_A[i][lig]*GPU_B[col][i];
+		}
+		
+		// Ecriture du resultat dans C
+		GPU_C[col][lig] = res;
+	}
+}
+[...]
+	case GK2 :
+	Db.x = BLOCK_SIZE_X_K2;
+	Db.y = BLOCK_SIZE_Y_K2;
+	Db.z = 1;
+	// La condition ternaire ajoute un bloc si la taille de la matrice n'est pas une puissance de 2
+	Dg.x = SIZE/BLOCK_SIZE_X_K2 + (SIZE%BLOCK_SIZE_X_K2  ?  1  :  0);
+	Dg.y = SIZE/BLOCK_SIZE_Y_K2 + (SIZE%BLOCK_SIZE_Y_K2  ?  1  :  0);
+	Dg.z = 1;
+	MatrixProductKernel_v0<<<Dg,Db>>>();
+	break;	
+\end{lstlisting}
 \subsection{Kernel 4 : Blocs 2D, avec gestion de mémoire}
-
+\begin{lstlisting}
+#define BLOCK_SIZE_X_K4     32
+#define BLOCK_SIZE_Y_K4 BLOCK_SIZE_X_K4
+\end{lstlisting}
+\begin{lstlisting}
+__global__ void MatrixProductKernel_v1(void){
+	int i,j;
+	// Calcul des index
+	int col = (blockIdx.x * blockDim.x) + threadIdx.x;
+	int lig = (blockIdx.y * blockDim.y) + threadIdx.y;
+	double res = 0.0;
+		
+	// Acces a la memoire partagee 
+	__shared__ double shared_A[BLOCK_SIZE_X_K4][BLOCK_SIZE_Y_K4];
+	__shared__ double shared_B[BLOCK_SIZE_X_K4][BLOCK_SIZE_Y_K4];
+	
+	// Pour chaque bloc de la matrice
+	for(i = 0; i <	(SIZE / BLOCK_SIZE_X_K4)+(SIZE%BLOCK_SIZE_X_K4?1:0); i++){
+		// Calcul de l'offset 
+		int offset = i * BLOCK_SIZE_X_K4;
+		
+		// Si le thread n'est pas hors limite de A
+		if((offset+threadIdx.x) < SIZE && lig < SIZE){
+			shared_A[threadIdx.y][threadIdx.x] = GPU_A[lig][offset + threadIdx.x];
+		}
+		// Si le thread n'est pas hors limite de B
+		if((offset+threadIdx.y) < SIZE && col < SIZE){
+			shared_B[threadIdx.y][threadIdx.x] = GPU_B[offset + threadIdx.y][col];
+		}
+		__syncthreads();
+		// On attend que tous les threads ont finis d'ecrire	
+		
+		
+		// Si le bloc de threads ne se trouve pas en bordure
+		if(offset < SIZE-1){
+			for(j=0;j<BLOCK_SIZE_X_K4;j++){
+				res += shared_A[threadIdx.y][j]*shared_B[j][threadIdx.x];
+			}
+		// Sinon seul les threads eligibles peuvent calculer
+		}else{
+			for(j=0;j< (SIZE%BLOCK_SIZE_X_K4);j++){
+				res += shared_A[threadIdx.y][j]*shared_B[j][threadIdx.x];			
+			}			
+		}
+		
+		if(col < SIZE && lig < SIZE){
+			GPU_C[lig][col] = res;
+		}
+		__syncthreads();
+		// On attend que tous les threads ont finis
+	}
+}
+[...]
+	case GK4 :
+	Db.x = BLOCK_SIZE_X_K4;
+	Db.y = BLOCK_SIZE_Y_K4;
+	Db.z = 1;
+	// La condition ternaire ajoute un bloc si la taille de la matrice n'est pas une puissance de 2
+	Dg.x = SIZE/BLOCK_SIZE_X_K4 + (SIZE%BLOCK_SIZE_X_K4  ?  1  :  0);
+	Dg.y = SIZE/BLOCK_SIZE_Y_K4 + (SIZE%BLOCK_SIZE_Y_K4  ?  1  :  0);
+	Dg.z = 1;
+	MatrixProductKernel_v1<<<Dg,Db>>>();
+	break;	
+\end{lstlisting}
 \end{document}
