@@ -150,7 +150,7 @@
 					Université de Strasbourg 								% Institution of author
 					\par\end{flushleft}\HorRule}
 
-\date{19 septembre 2016}																			
+\date{3 octobre 2016}																			
 
 
 
@@ -165,7 +165,7 @@ Dans ce rapport, nous expliquerons tout d'abord les problématiques de dimension
 \section{Contexte}
 \subsection{Environnement d'expérimentation}
 Comme dit précédemment, nous travaillons ici sur une carte graphique \textbf{gtx680, architecture Kepler}. Les données ont été prélevées une seule fois, puis notées sur un fichier \texttt{Excel} prévu à cet effet. Ensuite, nous avons converti ces donnés au format \texttt{csv}, qui ont ensuite été représentées graphiquement avec \texttt{Gnuplot}. Parallèlement, nous avons aussi intégré dans ce rapport un graphique qui était déjà généré dans la feuille \texttt{Excel}.
-\subsection*{Des dilemmes de pavage}
+\subsection{Des dilemmes de pavage}
 L'intérêt du calcul distribué sur une carte graphique est de mettre à profit la puissance de calcul d'une GPU. En revanche, les GPU sont optimisées pour les calculs dits \textit{SIMD}, pour \textit{single instruction - multiple data}, ce qui veut dire qu'il est très simple pour une carte graphique de réaliser moult fois la même instruction sur un grand jeu de données diversifiées. Le calcul matriciel correspond exactement à ce genre de calculs.\par
 Une GPU s'organise en blocs de \textit{threads}, aussi appelés \textit{warps}. Chaque \textit{thread} est en charge d'une toute partie du calcul. En effet ces \textit{threads} ne sont pas faits pour se comporter comme des \textit{threads} POSIX : ils sont conçus pour réaliser des calculs très très simples. Ici, par exemple, un \textit{thread} est en charge d'une seule et unique case de la matrice résultat à la fois. Ce qui veut dire qu'il gère la somme de $Nb_{colonnes}(\mathcal{A}) \times (Nb_{lignes}\mathcal{B})$ produits de \texttt{double}.\par
 Une première contrainte est que le nombre de \textit{threads} par bloc ne peut dépasser 1024. On est aussi limité pour le nombre total de blocs, mais cette limite ne nous a pas concerné pour notre TP, celle-ci allant de $2^{16}$ à $2^{31} - 1$. Le dilemme mis en exergue dans ce TP concerne le dimensionnement de ces blocs : en effet, on peut subdiviser les matrices à multiplier entre elles en blocs de différentes tailles, ce qui a différentes conséquences. Les questions auxquelles nous essaierons de répondre sont : 
@@ -174,6 +174,7 @@ Une première contrainte est que le nombre de \textit{threads} par bloc ne peut 
 \item Sur deux dimensions, quel(s) facteur(s) influe le plus sur les différentes puissances/durées de calcul?
 \end{itemize}
 
+\section{Allocation de blocs d'une seule dimension}
 \begin{figure}
     \subfloat[Temps de calcul en fonction de la largeur de bloc.
       \label{img:1DK1_time}]{%
@@ -188,10 +189,61 @@ Une première contrainte est que le nombre de \textit{threads} par bloc ne peut 
     \label{fig:1DK1}
 \end{figure}
 
+\subsection{Analyse relative}
+La figure \ref{fig:1DK1} présente, à gauche, le temps d'exécution du produit en fonction de la largeur du bloc, et à droite, la la puissance d'exécution en fonction de la largeur du bloc.\par
+Dans l'étude \textbf{relative} des résultats, c'est à dire lorsqu'on les compare entre eux, deux choses importantes sont à notes : 
+\begin{itemize}
+\item Le seul écart notable est entre 32 et 64 \textit{threads} de largeur pour le bloc. Comme mentionné en cours, les meilleurs résultats sont souvent obtenus entre 32 et 64 threads par bloc, ici la bonne réponse est 64.
+\item 64 n'est que légèrement meilleur que les valeurs qui lui sont supérieures. Néanmoins 64 est clairement la meilleure valeur. C'est le meilleur compromis entre le nombre de blocs et la taille des blocs. Au-delà, les blocs sont trop grands pour être le plus performant. En deçà de 64 \textit{threads}, il y a sûrement trop de communication de données par rapport au temps total de calcul.
+\end{itemize}
 
+\subsection{Analyse absolue}
+Dans l'absolu, ce produit matriciel avec un bloc 1D n'est pas très performant. En effet, pour comparaison, le même calcul avec le CPU a pris \textbf{3.73 secondes} pour une puissance de calcul de \textbf{36.81 gigaflops}. On voit donc que le CPU est plus performant que le GPU en bloc 1D. On comprend donc que la GPU n'est pas suffisamment monopolisée, le calcul pas assez bien distribué pour qu'il puisse être réellement rentable.
 
+\section{Allocations de blocs 2 dimensions sans mémoire partagée}
 
-\subsection*{Initialisation MPI}
+\subsection{Violation de la coalescence des données}
+Avant d'analyser les résultats concrètement obtenus, nous rappelons que, lors du TP, nous avons expérimenté un échange simple entre lignes et colonnes dans l'algorithme du produit, qui intervertissait juste le sens de parcours et donc le découpage en blocs lors du calcul de la matrice résultat. Nous avions alors vu que cette simple modification avait un impact considérable sur les résultats. Nous avions en fait observé une violation de la coalescence des données. En d'autres termes, les données parcourues en mémoire n'étaient plus, ou beaucoup moins contiguës, ce qui avait pour conséquence une immense perte de temps, sans doute provoquée par des va et viens dans le cache ou bien par une plus grande durée moyenne des communications.
+
+\subsubsection{Analyse des résultats en 2D sur le kernel 2 en jouant sur X et Y sans mémoire partagée}
+Dans cette partie, nous allons donc jouer sur un deuxième facteur pour améliorer les performances et les rendre enfin meilleures que sur la CPU. Pour ce faire, nous allons désormais jouer sur \textbf{deux} paramètres afin d'étudier les résultats : la \textit{hauteur} et la \textit{largeur} des blocs. Ainsi, les blocs pourront potentiellement contenir des données en mémoire de manière plus contiguë. Cela pourrait potentiellement diminuer le temps de calcul étant donné que les mêmes données seront peut-être chargées en cache pour plusieurs \textit{threads}.\par
+La figure \ref{fig:2DK2_power} est une représentation des résultats obtenus. Comme il s'agit d'un tableau à trois dimensions, le graphe utilisé ici, qui nous a gracieusement été fourni par notre enseignant, se sert de l'axe des abscisses pour la variable $\mathcal{X}$, la largeur du bloc, et de l'axe des ordonnées pour la variable $\mathcal{Y}$. La troisième variable, la puissance de calcul, est elle représentée par la couleur appliquée au niveau de l'intersection des deux points. On voit que la couleur bleu, par exemple, témoigne d'une puissance inférieure à 20 Gflops, tandis que la couleur violette témoigne d'une puissance de calcul entre 60 et 80 Gflops, la plus haute puissance de calcul enregistrée dans ce TP et avec le kernel 2 étant de \textbf{70.94} Gflops, pour $ X = 16 $ et $Y = 64$.\par
+\begin{figure} 
+      \includegraphics[keepaspectratio,width=10cm]{img/Gflops_depending_bloc_size.png}
+	  \caption{Puissance de calcul en fonction de la hauteur du bloc $\mathcal{Y}$ (en ordonnées) et de la largeur des blocs $\mathcal{X}$ (en abscisse).}
+      \label{fig:2DK2_power}
+\end{figure} 
+Là encore, on constate que les meilleurs résultats obtenus sont ceux ayant des $ X $ et des $ Y $ ayant des valeurs intermédiaires. Il s'agit des valeurs violette sur le graphique. Nous allons étudier plus précisément les 5 meilleurs scores, qui sont assez représentatifs.\newpage
+\begin{itemize}
+\item $X = 16$; $Y = 64$ $( 16 \times 64 = 1024 ) \rightarrow 70.94$ Gflops 
+\item $X = 16$; $Y = 32$ $( 16 \times 32 = 512 ) \rightarrow 70.00$ Gflops 
+\item $X = 16$; $Y = 16$ $( 16 \times 16 = 256 ) \rightarrow 68.16$ Gflops 
+\item $X = 64$; $Y = 8$ $( 64 \times 8 = 256 ) \rightarrow 61.20$ Gflops 
+\item $X = 128$; $Y = 8$ $( 128 \times 8 = 1024 ) \rightarrow 61.16$ Gflops 
+\end{itemize}
+
+Bien qu'on ne puisse pas donner de règle absolue, étant donné que certains résultats ne diffèrent que très faiblement, on constate tout de même une certaine tendance. Si \texttt{X} est égal à 16, alors \texttt{Y} est inclus entre 16 et 32, tandis que si \texttt{Y} est égal à 8, X est égal à 64 ou 128. Ainsi leur produit est toujours inclus entre 256 et 1024.\par
+Au contraire, on constate que de manière générale, les valeurs 1,2,4,256,512 et 1024 ne donnent pas les meilleurs résultat, quelque soit leur pendant sur l'autre axe, et quelque soit le fait qu'il s'agisse de \texttt{X} ou de \texttt{Y}.\par
+On devine ainsi que le pavage optimal tend vers une forme carrée, avec un carré ni trop grand ni trop petit. Il est tout à fait compréhensible que le carré ne dût pas avoir une surface supérieure à 1024, puisque cela n'est pas supporté par CUDA. On comprend aussi que le carré ne doive pas être trop petit, car dans ce cas là, on aurait trop de communications et de chargements comparé au nombre de calculs effectué par chaque bloc. En fait, on voit très bien sur la figure \ref{fig:2DK2_power} que les valeurs du milieu sont les plus élevées.
+
+\section{Analyse des résultats en 2D sur le kernel 4 avec mémoire partagée}
+Pour l'instant nous ne nous étions pas préoccupés des allocations mémoires et des registres utilisés. Dans cette section, c'est exactement ce qui va nous intéresser. Nous allons tenter d'optimiser l'allocation des différentes mémoires de la GPU pour ce calcul matriciel.
+
+\subsection{Considérations théoriques}
+\subsubsection{Allocation mémoire pour les sous-matrices de $\mathcal{C}$}
+Pour optimiser \textit{matériellement }le produit matriciel, nous nous sommes servis de la \textbf{mémoire partagée} (plus couramment appelée sous son nom anglais \textit{shared memory}). La mémoire partagée d'une GPU ayant une taille plutôt restreinte, il faut l'utiliser intelligemment. C'est pourquoi nous avons procédé de la manière suivante.\par
+Nous savons que chaque \textit{thread} est responsable, pour un bloc donné, d'un seul et unique élément de la matrice résultat $\mathcal{C}$. Or, pour calculer cet élément, il faut faire une addition incrémentale de produits d'éléments des matrices $\mathcal{A}$ et $\mathcal{B}$. Le registre est la mémoire la plus rapide pour les calculs sur GPU. Par conséquent, il suffit d'un seul registre,un \texttt{double}, pour stocker progressivement le résultat de cette somme incrémentale de produits. Comme il y a assez de registres pour stocker \texttt{X} $\times$ \texttt{Y} doubles sur la carte graphique. En effet, il y a au maximum besoin de \texttt{SIZE} $\times$ \texttt{SIZE} registres en même temps, dans le cas peu optimal où l'on utilise un seul bloc pour calculer tout le produit. Dans notre cas de figure, étant donné que de toute manière nous ne pouvions pas effectuer de calcul de plus de 11 secondes environ, nous ne pourrions jamais manipuler de matrice vraiment très grande, ce qui nous autorisait par conséquent à utiliser des registres pour stocker les résultat intermédiaire pour chaque \textit{thread}. Dans un contexte où les blocs sont trop grands, nous eussions dû utiliser mémoire partagée pour stocker les résultats intermédiaires. C'est d'ailleurs la solution qui nous était présentée à l'origine dans l'enoncé.\par
+En revanche, il fallait réaliser les produits à partir de sous-parties des matrices $\mathcal{A}$ et $\mathcal{B}$. 
+\subsubsection{Allocation de mémoire partagée  $\mathcal{A}$ et $\mathcal{B}$}
+Ces éléments étaient trop nombreux pour être stockés dans des registres pour chaque \textit{thread}, nous devions donc les charger dans la \textbf{mémoire partagée}. Ainsi, pour calculer les éléments d'une sous-partie de la matrice résultat de $\mathcal{C}$, il fallait charger en mémoire partagée des lignes entières et des colonnes entières de $\mathcal{A}$ et $\mathcal{B}$. Ainsi, si notre sous-bloc de $\mathcal{C}$ faisait \texttt{BLOC\_SIZE\_X} colonnes pour \texttt{BLOC\_SIZE\_Y} lignes, il fallait charger en mémoire partagée \texttt{BLOC\_SIZE\_Y}  $\times$ \textbf{\texttt{SIZE}} $+$ \texttt{BLOC\_SIZE\_X}  $\times$ \textbf{\texttt{SIZE}} éléments en mémoire partagée! Soit (\texttt{BLOC\_SIZE\_Y} $+$ \texttt{BLOC\_SIZE\_X}) $\times$ \textbf{\texttt{SIZE}} éléments.\par
+Pour accélérer au maximum le produit matriciel, nous avons donc, pour un sous-bloc de $\mathcal{C}$ donnée, à chaque fois chargé les lignes et les colonnes correspondantes en mémoire partagée, qui est la deuxième mémoire la plus rapide d'accès pour les \textit{threads} en dehors des registres. Comme $\mathcal{A}$ et $\mathcal{B}$ n'étaient ici accédées qu'en lecture, il n'y avait pas de problème d'accès concurrents à ce niveau.
+\subsubsection{Problèmes de synchronisation}
+En revanche, pour $\mathcal{C}$, il était indispensable d'attendre que tous les \textit{threads} aient fini leurs calculs pour un même élément du sous-bloc avant de calculer le sous-bloc suivant. Il fallait donc mettre une barrière, un appel de la fonction CUDA \texttt{sync\_threads()}. Pour être plus précis, nous avons placé un appel à cette barrière une fois après les chargement dans la mémoire partagée, et une fois après l'enregistrement du registre dans la matrice $\mathcal{C}$. Ainsi on est certain que chaque \textit{thread} a les bonnes données avant d'entamer ses additions, et que tous les résultats ont été enregistrés avant de passer au bloc suivant.
+\subsection{Analyse des résultats avec mémoire partagée}
+
+\section{Annexe : code}
+
+\subsection{Exemple du rapport précédent}%A supprimer, Ben ;)
 \begin{lstlisting}
 #include <stdio.h>
 #define N 10
@@ -204,7 +256,6 @@ void ProcessorInit(void){
 }
 \end{lstlisting}
 
-\newpage
 
 \subsection*{Calcul de l'offset pour un processus {\texttt{Me} donné}}
 \begin{lstlisting}
@@ -232,4 +283,9 @@ void OneStepCirculation(unsigned long step)
 
 
 \end{lstlisting} 
+
+\subsection{Kernel 1 : Blocs 1D}
+\subsection{Kernel 2 : Blocs 2D, sans gestion de mémoire}
+\subsection{Kernel 4 : Blocs 2D, avec gestion de mémoire}
+
 \end{document}
