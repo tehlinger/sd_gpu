@@ -241,6 +241,33 @@ Pour accélérer au maximum le produit matriciel, nous avons donc, pour un sous-
 En revanche, pour $\mathcal{C}$, il était indispensable d'attendre que tous les \textit{threads} aient fini leurs calculs pour un même élément du sous-bloc avant de calculer le sous-bloc suivant. Il fallait donc mettre une barrière, un appel de la fonction CUDA \texttt{sync\_threads()}. Pour être plus précis, nous avons placé un appel à cette barrière une fois après les chargement dans la mémoire partagée, et une fois après l'enregistrement du registre dans la matrice $\mathcal{C}$. Ainsi on est certain que chaque \textit{thread} a les bonnes données avant d'entamer ses additions, et que tous les résultats ont été enregistrés avant de passer au bloc suivant.
 \subsection{Analyse des résultats avec mémoire partagée}
 
+Pour se simplifier la tâche, nous ne comparons dans cette section que les performances de produits sur les grilles carrées de 64, 256 et 1024 éléments (respectivement 8, 16 et 32 cases de côté). Les performances sont données figure \ref{fig:K4}.\par
+On constate que les résultats sont concluants. Pour rappel, avec un bloc 1D et avec un bloc 2D, le seul moyen d'améliorer les performances était de trouver le meilleur compromis au niveau de la taille des blocs. En 2D, le meilleur résultat se produisait avec un bloc de 16 $\times$ 64, tandis qu'un 1D il avait lieu avec un bloc de 1 $\times$ 6
+. Dans tous les cas, des blocs trop grands donnaient des résultats moins bons.\par
+Or, ici, bien qu'en échelle log-log la courbe de performances ne soit pas parfaitement linéaire, et donc que le performances ne s'améliorent pas exactement proportionnellement au nombre d'éléments dans les blocs, on constate que les performances s'améliorent toujours et ce jusqu'à un bloc de 1024 éléments au moins. Deux conclusions très positives en découlent.\par 
+Premièrement, on obtenait une puissance de calcul de 68,16 Gflops pour des blocs 16 $\times$ 16 sans la mémoire partagée, contre \textbf{99,65} Gflops avec la mémoire partagée. Et bien que nous n'ayons pas pu mesurer les performances en 8 $\times$ 8 sans mémoire partagée, on voit tout de même que en 8 $\times$ 16 ou en  sans mémoire partagée on est à 55,94 Gflops contre \textbf{69,7} Gflops en 8 $\times$ 8 avec mémoire partagée. Enfin on est à 60,27 Gflops en 32 $\times$ 32 sans mémoire partagée contre \textbf{104,51} Gflops avec mémoire partagée. On voit donc que dans l'absolu, les performances du calcul avec la mémoire partagée sont bien meilleures que sans la mémoire partagée.\par
+De plus, on voit dans la courbe de performance que, alors que les performances baissent si le carré est trop grand sans mémoire partagée, elles \textbf{augmentent constamment} avec la mémoire partagée. Ainsi, il semble qu'on se libère d'une contrainte qui bloquait l'amélioration des performances, grâce à la mémoire partagée.
+
+\begin{figure}
+    \subfloat[Temps de calcul en fonction de la taille du bloc (en nombre d'éléments).
+      \label{fig:K4_time}]{%
+      \includegraphics[keepaspectratio,width=0.47\textwidth]{img/K4_time.png}
+    }
+    \hfill
+    \subfloat[Puissance de calcul en fonction de la taille du bloc (en nombre d'éléments) avec et sanns mémoire partagée.
+      \label{fig:K4_power}]{%
+      \includegraphics[keepaspectratio,width=0.47\textwidth]{img/K4_K2.png}
+    }
+    \caption{Temps et puissance de calcul en fonction de la taille du bloc de \textit{threads} (\texttt{Size} $\times$ \texttt{Size}).}
+    \label{fig:K4}
+\end{figure}
+\newpage
+\section{Conclusion}
+En conclusion, nous avons vu dans ce TP CUDA les différentes manières de programmer un produit matriciel de grande ampleur. Dans le pire des cas, avec des bloc 1D, nous atteignions des performances moins bonnes qu'un calcul séquentiel sur le CPU. Probablement parce que les communications et les allocations mémoire étaient trop gourmands comparé au temps effectif de calcul. Il est intéressant de noter qu'une augmentation des blocs peut entraîner une régression des performances.\par
+Néanmoins, dès qu'on utilise des blocs 2D, et ce sans faire attention au détail de l'allocation mémoire, les performances sont bien meilleures sur le GPU que sur le CPU. En revanche, il faut faire très attention au dimensionnement des blocs, en essayant de trouver un bon compromis entre le ratio largeur/hauteur et la taille totale des blocs. Ce compromis doit être déterminé empiriquement, mais nous avons vu en cours et vérifié expérimentalement qu'il fallait chercher dans les valuers tournant autour de 16, 32 ou 64 \textit{threads} de largeur pour un cours. Nous avons aussi mis en exergue l'importance de la coalescence des données, qui, si elle n'est pas respectée, peur grandement détériorer les performances globales.\par
+Enfin, les performances sont très fortement améliorées si l'on gère attentivement l'allocation des données dans les registres et en mémoire partagée. une allocation astucieuse, mais qui nécessite en revanche de faire attention à la synchronisation des \textit{threads}, nous permet d'améliorer les performances en fonction de la taille du carré, sans seuil. Performances qui deviennent logiquement bien meilleures que lorsqu'on ne gère pas du tout l'allocation des données en mémoire. En annexes, on trouvera le code produit qui illustre notre manière de résoudre les différents problèmes posés.
+\newpage
+
 \section{Annexe : code}
 
 \subsection{Exemple du rapport précédent}%A supprimer, Ben ;)
